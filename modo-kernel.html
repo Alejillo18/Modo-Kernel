@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modo Kernel</title>
+<meta name="description" content="Juego de preguntas sobre virtualización y máquinas virtuales, basado en el capítulo 8.3 de Tanenbaum.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=IBM+Plex+Sans:wght@400;600&display=swap">
+<style>
+/* Hoja de examen de laboratorio: gris frío, tinta negra, un solo azul. Esquinas rectas, filas separadas por líneas. */
+:root {
+  --bg: #EDEFF2;
+  --paper: #FFFFFF;
+  --ink: #161616;
+  --muted: #565A60;
+  --line: #C4C8CE;
+  --accent: #0F62FE;
+  --on-accent: #FFFFFF;
+  --good: #167A34;
+  --bad: #C9202B;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121316;
+    --paper: #1B1D21;
+    --ink: #F1F2F4;
+    --muted: #A3A8B0;
+    --line: #3A3E45;
+    --accent: #78A9FF;
+    --on-accent: #0B1220;
+    --good: #5FD282;
+    --bad: #FF8F95;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 18px;
+  line-height: 1.5;
+  padding: 0 clamp(16px, 5vw, 40px) 72px;
+}
+.page { max-width: 720px; margin: 0 auto; }
+.top {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px 16px; flex-wrap: wrap;
+  padding: 18px 0 10px; border-bottom: 3px solid var(--ink);
+  font-family: var(--mono); font-size: 14px;
+}
+.top b { letter-spacing: .06em; text-transform: uppercase; }
+.top span { color: var(--muted); }
+h1, h2, h3, p, ol, ul, dl, dd { margin: 0; padding: 0; }
+h1 {
+  font-family: var(--mono); font-weight: 700; text-transform: uppercase; letter-spacing: -.03em;
+  font-size: clamp(52px, 15vw, 104px); line-height: .92; margin-top: 40px;
+}
+h2 { font-family: var(--sans); font-weight: 600; font-size: clamp(22px, 5.2vw, 28px); line-height: 1.3; text-wrap: balance; }
+h3 { font-family: var(--mono); font-weight: 700; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; }
+.lede { margin-top: 24px; max-width: 52ch; }
+.sec { margin-top: 40px; display: grid; gap: 12px; }
+.pts { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
+.pts div { padding: 12px 14px 12px 0; display: grid; gap: 2px; }
+.pts div + div { padding-left: 14px; border-left: 1px solid var(--line); }
+.pts strong { font-family: var(--mono); font-size: 22px; line-height: 1.1; }
+.pts span { font-size: 14px; color: var(--muted); line-height: 1.3; }
+.ranks { list-style: none; border-top: 1px solid var(--ink); }
+.ranks li { display: grid; grid-template-columns: 22px 1fr auto; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.ranks .sq { width: 14px; height: 14px; border: 2px solid var(--ink); }
+.ranks li[data-r="3"] .sq { background: var(--ink); }
+.ranks li[data-r="2"] .sq { background: linear-gradient(to top, var(--ink) 66%, transparent 66%); }
+.ranks li[data-r="1"] .sq { background: linear-gradient(to top, var(--ink) 33%, transparent 33%); }
+.ranks b { font-family: var(--mono); font-size: 16px; }
+.ranks span:last-child { font-family: var(--mono); font-size: 14px; color: var(--muted); text-align: right; }
+.ranks.final li { opacity: .4; }
+.ranks.final li.on { opacity: 1; background: var(--paper); box-shadow: -10px 0 0 var(--paper), 10px 0 0 var(--paper); border-left: 0; }
+.ranks.final li.on b { color: var(--accent); }
+.go { margin-top: 32px; display: flex; gap: 16px 24px; flex-wrap: wrap; align-items: center; }
+.btn {
+  font: 700 17px var(--mono); letter-spacing: .02em;
+  background: var(--accent); color: var(--on-accent);
+  border: 2px solid var(--accent); border-radius: 0; padding: 14px 24px; cursor: pointer;
+  min-height: 48px;
+}
+.btn:hover { background: transparent; color: var(--accent); }
+.btn.alt { background: transparent; color: var(--ink); border-color: var(--ink); }
+.btn.alt:hover { background: var(--ink); color: var(--bg); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.note { font-family: var(--mono); font-size: 14px; color: var(--muted); }
+
+/* Partida */
+.bar { margin-top: 18px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; font-family: var(--mono); font-size: 15px; font-variant-numeric: tabular-nums; }
+.bar .n { font-size: clamp(34px, 9vw, 52px); font-weight: 700; line-height: 1; letter-spacing: -.03em; }
+.bar .n small { font-size: .45em; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.bar .stats { display: flex; gap: 20px; color: var(--muted); }
+.bar .stats b { color: var(--ink); }
+.segs { margin-top: 12px; display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; }
+.seg { height: 8px; background: var(--line); }
+.seg.ok { background: var(--good); }
+.seg.no { background: var(--bad); }
+.seg.now { background: var(--ink); }
+.timer { margin-top: 6px; height: 3px; background: var(--line); }
+.timer i { display: block; height: 100%; background: var(--accent); transform-origin: left; transition: transform .1s linear; }
+.timer.low i { background: var(--bad); }
+.q { margin-top: 28px; }
+.opts { margin-top: 22px; list-style: none; border-top: 1px solid var(--ink); }
+.opts li { border-bottom: 1px solid var(--line); }
+.opt {
+  width: 100%; display: grid; grid-template-columns: 34px 1fr; gap: 14px; align-items: start; text-align: left;
+  font: 400 18px/1.45 var(--sans); color: var(--ink);
+  background: transparent; border: 0; border-radius: 0; padding: 14px 6px 14px 0; cursor: pointer;
+}
+.opt kbd { font: 700 14px var(--mono); width: 28px; height: 28px; display: grid; place-items: center; border: 2px solid var(--ink); }
+.opt:hover:not(:disabled) kbd { background: var(--ink); color: var(--bg); }
+.opt:disabled { cursor: default; }
+.opt.good kbd { background: var(--good); border-color: var(--good); color: var(--paper); }
+.opt.bad kbd { background: var(--bad); border-color: var(--bad); color: var(--paper); }
+.opt.dim { color: var(--muted); }
+.tag { display: block; font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: .06em; margin-top: 2px; }
+.opt.good .tag { color: var(--good); }
+.opt.bad .tag { color: var(--bad); }
+.fb { margin-top: 24px; padding: 16px 0 0 16px; border-left: 4px solid var(--ink); display: grid; gap: 12px; }
+.fb.good { border-left-color: var(--good); }
+.fb.bad { border-left-color: var(--bad); }
+.verdict { font-family: var(--mono); font-weight: 700; font-size: 17px; }
+.fb.good .verdict { color: var(--good); }
+.fb.bad .verdict { color: var(--bad); }
+.ref { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+
+/* Final */
+.big { margin-top: 36px; font-family: var(--mono); font-weight: 700; text-transform: uppercase; letter-spacing: -.03em; font-size: clamp(36px, 10.5vw, 72px); line-height: .98; text-wrap: balance; }
+.score { margin-top: 28px; display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
+.score div { padding: 12px 12px 12px 0; display: grid; gap: 2px; }
+.score div + div { padding-left: 14px; border-left: 1px solid var(--line); }
+.score small { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.score strong { font-family: var(--mono); font-size: clamp(22px, 6vw, 32px); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.miss { list-style: none; border-top: 1px solid var(--ink); counter-reset: m; }
+.miss li { counter-increment: m; display: grid; grid-template-columns: 28px 1fr; gap: 10px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.miss li::before { content: counter(m); font-family: var(--mono); font-weight: 700; color: var(--bad); }
+.miss p { font-size: 16px; line-height: 1.45; }
+.miss p + p { margin-top: 4px; }
+.miss .ok { font-weight: 600; }
+
+@media (max-width: 480px) {
+  body { font-size: 17px; }
+  .opt { font-size: 17px; grid-template-columns: 30px 1fr; gap: 12px; }
+  .pts span { font-size: 13px; }
+  .pts div + div, .score div + div { padding-left: 10px; }
+  .ranks li { grid-template-columns: 20px 1fr; }
+  .ranks span:last-child { grid-column: 2; text-align: left; margin-top: -8px; }
+  .btn { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .timer i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top"><b>Modo Kernel</b><span>Virtualización · Tanenbaum, cap. 8.3</span></header>
+
+  <main>
+    <section id="start">
+      <h1>Modo<br>Kernel</h1>
+      <p class="lede">Diez preguntas sobre virtualización y máquinas virtuales. Cada acierto te acerca al hardware. Tenés 25 segundos por pregunta.</p>
+
+      <div class="sec">
+        <h3>Puntaje</h3>
+        <div class="pts">
+          <div><strong>100</strong><span>por cada acierto</span></div>
+          <div><strong>+50</strong><span>según la rapidez</span></div>
+          <div><strong>+100</strong><span>por racha de 6 o más</span></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <h3>Rangos</h3>
+        <ol class="ranks" aria-label="Rangos">
+          <li data-r="3"><span class="sq" aria-hidden="true"></span><b>Modo kernel</b><span>9 o 10 aciertos</span></li>
+          <li data-r="2"><span class="sq" aria-hidden="true"></span><b>Hipervisor</b><span>7 u 8 aciertos</span></li>
+          <li data-r="1"><span class="sq" aria-hidden="true"></span><b>SO invitado</b><span>4 a 6 aciertos</span></li>
+          <li data-r="0"><span class="sq" aria-hidden="true"></span><b>Proceso de usuario</b><span>0 a 3 aciertos</span></li>
+        </ol>
+      </div>
+
+      <div class="go">
+        <button class="btn" id="go" type="button">Jugar →</button>
+        <span class="note" id="best"></span>
+      </div>
+      <p class="note" style="margin-top:20px">Teclado: 1 a 4 o A a D para responder, Enter para seguir.</p>
+    </section>
+
+    <section id="play" hidden>
+      <div class="bar">
+        <span class="n"><span id="n">1</span><small>/10</small></span>
+        <span class="stats"><span>Racha <b id="st">0</b></span><span>Puntos <b id="sc">0</b></span></span>
+      </div>
+      <div class="segs" id="segs" aria-hidden="true"></div>
+      <div class="timer" id="tm" aria-hidden="true"><i id="bar"></i></div>
+      <div class="q">
+        <h2 id="qt"></h2>
+        <ul class="opts" id="opts"></ul>
+        <div class="fb" id="fb" hidden aria-live="polite">
+          <p class="verdict" id="vd"></p>
+          <p id="ex"></p>
+          <p class="ref" id="rf"></p>
+          <div><button class="btn" id="next" type="button">Siguiente →</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="end" hidden>
+      <p class="big" id="rank"></p>
+      <div class="score">
+        <div><small>Puntos</small><strong id="fsc">0</strong></div>
+        <div><small>Aciertos</small><strong id="fok">0</strong></div>
+        <div><small>Mejor marca</small><strong id="fbest">0</strong></div>
+      </div>
+      <div class="sec">
+        <h3>Rango alcanzado</h3>
+        <ol class="ranks final" id="fstack">
+          <li data-r="3"><span class="sq" aria-hidden="true"></span><b>Modo kernel</b><span>9 o 10</span></li>
+          <li data-r="2"><span class="sq" aria-hidden="true"></span><b>Hipervisor</b><span>7 u 8</span></li>
+          <li data-r="1"><span class="sq" aria-hidden="true"></span><b>SO invitado</b><span>4 a 6</span></li>
+          <li data-r="0"><span class="sq" aria-hidden="true"></span><b>Proceso de usuario</b><span>0 a 3</span></li>
+        </ol>
+      </div>
+      <div class="sec" id="missWrap">
+        <h3>Para repasar</h3>
+        <ol class="miss" id="miss"></ol>
+      </div>
+      <div class="go"><button class="btn" id="again" type="button">Jugar de nuevo →</button></div>
+    </section>
+  </main>
+</div>
+
+<script>
+const Q = [
+  { q: "En un sistema con máquinas virtuales, ¿qué es lo único que corre en modo kernel?", o: ["El hipervisor", "Cada sistema operativo invitado", "Todos los procesos de usuario", "El BIOS de cada VM"], a: 0, e: "El hipervisor es el único software en modo kernel y tiene unas 100 veces menos líneas de código que un SO completo, por eso tiene menos errores.", r: "8.3" },
+  { q: "¿Qué ventaja da poner cada servicio en su propia máquina virtual?", o: ["Aislar fallas con menor costo que equipos separados", "Que cada servicio corra más rápido que sobre hardware real", "Evitar instalar un sistema operativo en cada servicio", "Que el servidor físico nunca pueda dejar de funcionar"], a: 0, e: "Una falla en una VM no tumba a las otras, con menor costo y administración más simple. El riesgo que queda es el servidor físico: si cae, caen todas.", r: "8.3" },
+  { q: "¿Dónde se ejecuta un hipervisor de tipo 1?", o: ["Directamente sobre el hardware", "Como programa de usuario sobre Windows o Linux", "Dentro del sistema operativo invitado", "Únicamente sobre CPUs sin modo kernel"], a: 0, e: "El tipo 1 es en realidad el sistema operativo: el único programa en modo kernel. El tipo 2 es el que corre como programa de usuario sobre un SO anfitrión.", r: "8.3.1" },
+  { q: "Un hipervisor de tipo 2 instala el SO invitado en un “disco virtual”. ¿Qué es ese disco?", o: ["Un archivo del sistema de archivos del anfitrión", "Una partición física reservada en el disco real", "Un sector especial dentro del BIOS de la VM", "Una unidad USB emulada por el hardware"], a: 0, e: "El disco virtual es solo un archivo (grande) en el sistema de archivos del sistema operativo anfitrión.", r: "8.3.3" },
+  { q: "Según Popek y Goldberg, una máquina se puede virtualizar solo si…", o: ["las instrucciones sensibles son un subconjunto de las privilegiadas", "las instrucciones privilegiadas son un subconjunto de las sensibles", "el procesador tiene más de un núcleo disponible", "la memoria virtual usa paginación de dos niveles"], a: 0, e: "Si en modo usuario se intenta algo que no corresponde, el hardware debe producir una trampa. Así el hipervisor puede atrapar y emular.", r: "8.3.1" },
+  { q: "¿Por qué el Intel 386 no se podía virtualizar?", o: ["Ignoraba en modo usuario instrucciones sensibles como POPF", "Era demasiado lento para correr varios sistemas a la vez", "No distinguía entre el modo kernel y el modo usuario", "No soportaba memoria virtual con paginación"], a: 0, e: "POPF en modo usuario simplemente no modificaba el bit de interrupciones y no producía trampa. El 386 y sus sucesores no cumplían la regla de Popek y Goldberg.", r: "8.3.1" },
+  { q: "¿En qué año empezaron Intel y AMD a incluir tecnología de virtualización (VT y SVM) en sus CPUs?", o: ["2005", "1974", "1990", "2015"], a: 0, e: "A partir de 2005. 1974 es el año del trabajo clásico de Popek y Goldberg.", r: "8.3.1" },
+  { q: "En una CPU con VT, el SO invitado ejecuta una instrucción sensible. ¿Qué pasa?", o: ["Se produce una trampa y el hipervisor la emula", "Se ejecuta directo en el hardware sin avisar a nadie", "Se ignora en silencio y el invitado sigue de largo", "El invitado se detiene y la VM queda destruida"], a: 0, e: "El conjunto de operaciones que se atrapan lo controla un mapa de bits que configura el hipervisor. Es el clásico método de atrapar y emular.", r: "8.3.2" },
+  { q: "La traducción binaria de VMware trabaja sobre…", o: ["bloques básicos", "páginas de memoria", "archivos ejecutables completos", "procesos del sistema anfitrión"], a: 0, e: "Explora el código en bloques básicos (secuencias que terminan en un salto o llamada), reemplaza las instrucciones sensibles y guarda el resultado en caché.", r: "8.3.3" },
+  { q: "Con VT, atrapar y emular siempre rinde más que la traducción binaria.", o: ["Verdadero", "Falso"], a: 1, fixed: true, e: "Falso. Atrapar genera muchas interrupciones que arruinan cachés, TLB y predicción de saltos. Según las mediciones, a veces el software vence al hardware.", r: "8.3.3" },
+  { q: "En la paravirtualización, ¿qué se modifica?", o: ["El código fuente del SO invitado", "El diseño físico del procesador", "Las aplicaciones que corren en el invitado", "Solamente el hipervisor de tipo 2"], a: 0, e: "Se elimina del SO invitado el uso de instrucciones sensibles: en su lugar hace llamadas al hipervisor, como un programa hace llamadas al sistema.", r: "8.3.4" },
+  { q: "Un hipervisor que solo soporta SO paravirtualizados se parece a…", o: ["un microkernel", "un compilador", "un servidor web", "un intérprete de Java"], a: 0, e: "Si no hay que emular instrucciones sensibles, el hipervisor solo ofrece servicios básicos como despachar procesos y administrar la MMU: un microkernel.", r: "8.3.4" },
+  { q: "¿Para qué sirve la tabla de páginas oculta (shadow) que mantiene el hipervisor?", o: ["Mapea páginas virtuales del invitado a páginas reales", "Guarda copias de seguridad de la memoria de cada VM", "Cifra todo el contenido de la memoria de cada invitado", "Acelera los accesos al disco virtual de cada máquina"], a: 0, e: "Dos invitados pueden querer la misma página física 10. El hipervisor mantiene una tabla oculta por VM y la actualiza cuando el invitado cambia la suya.", r: "8.3.5" },
+  { q: "El hipervisor puede mostrarle al invitado un disco IDE viejo aunque el disco real sea nuevo.", o: ["Verdadero", "Falso"], a: 0, fixed: true, e: "Verdadero. Traduce los comandos IDE a comandos del disco nuevo. Esta habilidad de reasignar dispositivos ayudó a que la VM/370 se hiciera popular.", r: "8.3.6" },
+  { q: "En Xen, ¿cómo se llama la máquina virtual que se encarga de la E/S?", o: ["Dominio 0", "Nodo maestro", "Kernel 0", "Hipervisor raíz"], a: 0, e: "Los invitados paravirtualizados piden operaciones de E/S al hipervisor, que las deriva al dominio 0.", r: "8.3.6" },
+  { q: "¿Por qué es más fácil migrar una VM que un proceso?", o: ["Solo hay que mover la imagen de memoria", "Las VMs no necesitan memoria, solo registros de CPU", "Un proceso no puede migrarse a ninguna otra máquina", "Una VM siempre ocupa menos espacio que un proceso"], a: 0, e: "Un proceso tiene estado crítico repartido en las tablas del SO (archivos abiertos, alarmas, manejadores de señales). En una VM todo eso viaja dentro de la imagen de memoria.", r: "8.3" },
+  { q: "¿Qué es un dispositivo virtual (virtual appliance)?", o: ["Una VM empaquetada, lista para ejecutarse", "Un teclado emulado por el hipervisor", "Un driver genérico para cualquier dispositivo", "Otro nombre que se le da al hipervisor"], a: 0, e: "Incluye SO, bibliotecas y aplicación. Solo quien la arma conoce las dependencias; el cliente recibe un paquete que funciona sin importar su SO.", r: "8.3.7" },
+  { q: "Una CPU con 4 núcleos, cada uno con hasta 8 máquinas virtuales. ¿Cuántos nodos tendría la multicomputadora virtual?", o: ["32", "12", "16", "8"], a: 0, e: "4 × 8 = 32 nodos. Con VMs y multinúcleo la cantidad de CPUs se define por software.", r: "8.3.8" },
+  { q: "Si falla el servidor físico que aloja todas las VMs, las demás siguen funcionando.", o: ["Verdadero", "Falso"], a: 1, fixed: true, e: "Falso. Consolidar servidores es poner todos los huevos en una canasta: si cae el servidor físico, caen todas las VMs.", r: "8.3" },
+  { q: "¿Qué ventaja práctica tiene el tipo 2 en la entrada/salida?", o: ["El anfitrión ya trae los drivers de dispositivos", "No necesita memoria para ejecutar las VMs", "Siempre es más rápido que un hipervisor de tipo 1", "No necesita ninguna clase de traducción"], a: 0, e: "El código traducido puede llamar a los drivers existentes del anfitrión. Un tipo 1 debe incluir el driver o llamar a uno en el dominio 0.", r: "8.3.6" },
+  { q: "Según el libro, ¿cuántos años tiene la tecnología de máquinas virtuales?", o: ["Más de 40 años", "Menos de 5 años", "Unos 10 años", "Alrededor de 20 años"], a: 0, e: "Surgió en 1967 con el sistema CP/CMS de IBM, luego llamado VM/370.", r: "8.3" },
+  { q: "¿Qué sistema de IBM dio origen a la idea de máquina virtual?", o: ["CP/CMS, luego VM/370", "OS/360 para procesamiento por lotes", "TSS/360, el sistema de tiempo compartido oficial", "z/OS para los mainframes actuales"], a: 0, e: "TSS/360 era el sistema oficial de IBM y fracasó; el grupo de Cambridge, Massachusetts, produjo CP/CMS, que IBM terminó aceptando.", r: "1.7.5" },
+  { q: "En VM/370, ¿qué entregaba el monitor de máquina virtual a la capa de arriba?", o: ["Copias exactas del hardware", "Máquinas extendidas con archivos", "Intérpretes de código intermedio", "Particiones fijas de disco"], a: 0, e: "A diferencia de otros SO, las VMs de VM/370 no eran máquinas extendidas: eran copias exactas del hardware, con modo kernel/usuario, E/S e interrupciones.", r: "1.7.5" },
+  { q: "En VM/370, ¿qué sistema de un solo usuario corría en muchas VMs para los usuarios interactivos?", o: ["CMS", "UNIX", "Windows", "Linux"], a: 0, e: "CMS (Conversational Monitor System) era popular entre los programadores. Una llamada al sistema de CMS se atrapaba en su propio SO, no en VM/370.", r: "1.7.5" },
+  { q: "Un hipervisor de tipo 2 es un programa de usuario que corre sobre un SO anfitrión.", o: ["Verdadero", "Falso"], a: 0, fixed: true, e: "Verdadero. Por ejemplo VMware Workstation corre como un programa de aplicación sobre Windows o Linux.", r: "8.3.1" },
+  { q: "En un hipervisor de tipo 1, la máquina virtual corre en modo kernel real.", o: ["Verdadero", "Falso"], a: 1, fixed: true, e: "Falso. La VM corre como proceso de usuario en modo usuario. Su SO solo cree estar en modo kernel (modo kernel virtual).", r: "8.3.2" },
+  { q: "¿Qué proyecto de investigación de Stanford dio origen a VMware?", o: ["DISCO", "Xen", "VMI", "Viridian"], a: 0, e: "VMware, el primer hipervisor de tipo 2, fue fruto del proyecto DISCO de la Universidad de Stanford.", r: "8.3.3" },
+  { q: "¿Qué universidad diseñó originalmente el hipervisor Xen?", o: ["Cambridge", "Stanford", "MIT", "Berkeley"], a: 0, e: "El libro lo describe como un hipervisor de código fuente abierto diseñado originalmente por la Universidad de Cambridge.", r: "8.3.4" },
+  { q: "En la paravirtualización, ¿qué significa la sigla VMI?", o: ["Virtual Machine Interface", "Virtual Memory Index", "Variable Machine Input", "Virtualization Mode Indicator"], a: 0, e: "Interfaz de máquina virtual: procedimientos genéricos que el kernel invitado llama cuando necesita hacer algo sensible.", r: "8.3.4" },
+  { q: "Un bloque básico sin instrucciones sensibles corre igual de rápido bajo VMware que en la máquina real.", o: ["Verdadero", "Falso"], a: 0, fixed: true, e: "Verdadero. Como no tiene nada que reemplazar, se ejecuta directo en el hardware.", r: "8.3.3" },
+  { q: "Para detectar que el invitado modifica sus tablas de páginas, el hipervisor puede…", o: ["marcarlas como solo lectura", "cifrarlas en el disco", "copiarlas a otra VM", "borrarlas al cambiar de VM"], a: 0, e: "Cuando el invitado intenta escribirlas se produce un fallo de página que le da el control al hipervisor, que actualiza las tablas ocultas. No es elegante, pero funciona.", r: "8.3.5" },
+  { q: "¿Qué mejora futura de VT menciona el libro para la virtualización de la memoria?", o: ["Asignación de dos niveles en hardware", "Cachés más grandes en cada núcleo", "Discos con acceso directo a la CPU", "Tablas de páginas de un solo nivel"], a: 0, e: "El hardware mapearía la página virtual a la física del invitado, y de ahí a la física real, sin interrupciones.", r: "8.3.5" },
+  { q: "¿Qué problema de la virtualización de E/S resuelve una MMU de E/S?", o: ["El del DMA", "El de la traducción binaria", "El de los fallos de página", "El de migrar VMs en caliente"], a: 0, e: "El DMA usa direcciones absolutas, y el hipervisor tendría que reasignarlas. Una MMU de E/S virtualiza la E/S como la MMU virtualiza la memoria.", r: "8.3.6" },
+  { q: "¿Para qué sirve usar máquinas virtuales en el desarrollo de software?", o: ["Probar un programa en muchos SO en una sola PC", "Compilar más rápido que en hardware real", "Evitar tener que escribir pruebas del software", "Usar más memoria física que la instalada"], a: 0, e: "Un programador puede crear una docena de VMs con distintos sistemas (Windows, varias versiones de Linux, BSD, Mac OS X) en una sola computadora.", r: "8.3" },
+  { q: "¿Cuántas particiones primarias soportan las PCs estándar, según el libro?", o: ["Cuatro", "Dos", "Ocho", "Diez"], a: 0, e: "Por eso particionar el disco para tener varios SO es más dificultoso que usar VMs, y además obliga a reiniciar para cambiar de sistema.", r: "8.3" },
+  { q: "¿Qué ventaja tienen las VMs frente a particionar el disco con un programa de multiarranque?", o: ["Todos los SO corren a la vez, sin reiniciar", "Cada SO corre más rápido que en hardware real", "Se necesita siempre menos espacio en disco", "No hace falta instalar controladores de disco"], a: 0, e: "Con VMs todos los sistemas operativos se ejecutan al mismo tiempo porque en realidad son procesos glorificados.", r: "8.3" },
+  { q: "¿Qué es la JVM (máquina virtual de Java)?", o: ["Una arquitectura virtual que ejecuta el código de Java", "Un hipervisor de tipo 1 diseñado por Sun para servidores", "Un sistema de archivos virtual para servidores web", "Un controlador de dispositivos para la plataforma Java"], a: 0, e: "El compilador de Java produce código para la JVM, que se ejecuta con un intérprete. Es un uso distinto de “máquina virtual”: no clona hardware real.", r: "1.7.5" },
+  { q: "En vez de clonar la máquina como las VMs, un exokernel…", o: ["reparte subconjuntos de recursos a cada VM", "emula por software todo el hardware de la CPU", "traduce los bloques básicos y los guarda en caché", "reescribe el código fuente del SO invitado"], a: 0, e: "Por ejemplo, una VM recibe los bloques de disco 0 a 1023 y la siguiente del 1024 al 2047. El exokernel solo verifica que ninguna use recursos ajenos.", r: "1.7.6" },
+  { q: "¿Cuánto rendimiento solían perder los intérpretes de Pentium que corrían sobre un Pentium?", o: ["De 5 a 10 veces más lentos", "Apenas un 1% más lentos", "No tenían ninguna pérdida", "Un 50% más lentos en promedio"], a: 0, e: "Esa pérdida de rendimiento de 5x a 10x los hacía inútiles para un trabajo serio, y por eso las VMs no interesaban en el mundo de la PC.", r: "1.7.5" },
+  { q: "VMware fue el primer hipervisor de tipo 2.", o: ["Verdadero", "Falso"], a: 0, fixed: true, e: "Verdadero. El libro lo presenta como el primero de estos hipervisores, nacido del proyecto DISCO de Stanford.", r: "8.3.3" },
+  { q: "¿Qué permite la combinación de VMs y CPUs multinúcleo?", o: ["Definir por software cuántas CPUs tiene la máquina", "Prescindir por completo del sistema operativo base", "Evitar el uso de memoria virtual", "Ejecutar programas sin instrucciones sensibles"], a: 0, e: "Un diseñador de aplicaciones puede elegir cuántas CPUs quiere y escribir el software de acuerdo con eso.", r: "8.3.8" },
+  { q: "¿Cómo logra VMI Linux correr también sobre hardware real?", o: ["Se enlaza con una biblioteca que emite la instrucción real", "Se recompila con un compilador distinto para cada máquina", "Se ejecuta dentro de un hipervisor que no se ve", "Reemplaza todas sus instrucciones con traducción binaria"], a: 0, e: "Sobre hardware básico usa una biblioteca que emite la instrucción sensible real; sobre VMware o Xen se enlaza con otra que hace la llamada al hipervisor.", r: "8.3.4" },
+  { q: "¿Por qué algunos hipervisores de tipo 1 usan traducción binaria?", o: ["Por rendimiento, aunque corra bien sin ella", "Porque ningún procesador actual soporta VT", "Porque el sistema invitado siempre lo exige", "Para ahorrar memoria en las tablas de páginas"], a: 0, e: "Las mediciones de Adams y Agesen (2006) muestran que atrapar es caro, y a veces el software vence al hardware.", r: "8.3.3" },
+  { q: "En un hipervisor de tipo 2 hay que reemplazar las instrucciones sensibles de los programas de usuario del invitado.", o: ["Verdadero", "Falso"], a: 1, fixed: true, e: "Falso. En los programas de usuario no hace falta: el hardware las ignora de todas formas.", r: "8.3.3" },
+  { q: "¿Qué es una instrucción privilegiada?", o: ["Una que atrapa si se ejecuta en modo usuario", "Una que solo puede ejecutar el hipervisor de tipo 2", "Una que se ejecuta siempre en dos núcleos a la vez", "Una que cifra los datos antes de escribirlos"], a: 0, e: "Es el término de Popek y Goldberg para las instrucciones que atrapan en modo usuario. Las sensibles son las que solo deberían ejecutarse en modo kernel.", r: "8.3.1" },
+  { q: "¿Qué ofrece una empresa de hospedaje web cuando alquila máquinas virtuales?", o: ["Un SO a elección del cliente, a bajo costo", "Una sola cuenta de usuario compartida en un servidor", "Una máquina física dedicada para cada cliente", "Un servidor donde el cliente no instala software"], a: 0, e: "Antes había que elegir entre hospedaje compartido (sin control del software) y dedicado (flexible pero caro). Con VMs, una máquina física soporta muchas VMs a la vez.", r: "1.7.5" },
+  { q: "¿Qué dice el libro sobre el límite entre un hipervisor de tipo 1 y un microkernel?", o: ["Es impreciso y se vuelve más difuso", "Es exacto y no cambia con el tiempo", "No existe: son exactamente lo mismo", "Depende solo del fabricante de la CPU"], a: 0, e: "A medida que los hipervisores ganan funciones y llamadas, la frontera se desdibuja. El tema es controversial.", r: "8.3.4" },
+  { q: "Según el libro, ¿cómo debe ser el programa que corre en modo kernel sobre el hardware?", o: ["Pequeño y confiable, de miles de líneas", "Grande, con millones de líneas de código", "Lo más completo posible, con todos los drivers", "Idéntico a un sistema operativo completo"], a: 0, e: "Debe consistir en miles de líneas de código, no en millones. Por eso el hipervisor tiene menos errores que un SO completo.", r: "8.3.4" }
+];
+
+const $ = (id) => document.getElementById(id);
+const N = 10, TIME = 25, KEY = "modo-kernel-mejor";
+const LETTERS = ["A", "B", "C", "D"];
+const RANKS = ["Proceso de usuario", "SO invitado", "Hipervisor", "Modo kernel"];
+let deck = [], i = 0, score = 0, streak = 0, ok = 0, log = [], answered = false, left = TIME, timer = null, mode = "start";
+
+function shuffle(a) { a = a.slice(); for (let k = a.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [a[k], a[j]] = [a[j], a[k]]; } return a; }
+function getBest() { try { return Number(localStorage.getItem(KEY)) || 0; } catch (e) { return 0; } }
+function setBest(v) { try { localStorage.setItem(KEY, String(v)); } catch (e) {} }
+function show(id) { mode = id; ["start", "play", "end"].forEach((s) => { $(s).hidden = s !== id; }); window.scrollTo(0, 0); }
+function bestLabel() { const b = getBest(); $("best").textContent = b ? "Mejor marca: " + b + " puntos" : ""; }
+
+function start() {
+  deck = shuffle(Q).slice(0, N).map((q) => {
+    if (q.fixed) return Object.assign({}, q);
+    const idx = shuffle(q.o.map((_, k) => k));
+    return Object.assign({}, q, { o: idx.map((k) => q.o[k]), a: idx.indexOf(q.a) });
+  });
+  i = 0; score = 0; streak = 0; ok = 0; log = [];
+  $("segs").innerHTML = "";
+  for (let k = 0; k < N; k++) { const s = document.createElement("div"); s.className = "seg"; $("segs").appendChild(s); }
+  show("play");
+  render();
+}
+
+function render() {
+  const q = deck[i];
+  answered = false; left = TIME;
+  $("n").textContent = i + 1;
+  $("sc").textContent = score;
+  $("st").textContent = streak;
+  $("qt").textContent = q.q;
+  $("fb").hidden = true;
+  $("tm").classList.remove("low");
+  [...$("segs").children].forEach((s, k) => { if (k === i) s.classList.add("now"); });
+  const box = $("opts");
+  box.innerHTML = "";
+  q.o.forEach((t, k) => {
+    const li = document.createElement("li");
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "opt"; b.dataset.k = k;
+    const kb = document.createElement("kbd"); kb.textContent = LETTERS[k];
+    const sp = document.createElement("span"); sp.textContent = t;
+    b.append(kb, sp);
+    b.addEventListener("click", () => answer(k));
+    li.appendChild(b);
+    box.appendChild(li);
+  });
+  $("bar").style.transform = "scaleX(1)";
+  clearInterval(timer);
+  timer = setInterval(() => {
+    left = Math.max(0, left - 0.1);
+    $("bar").style.transform = "scaleX(" + (left / TIME) + ")";
+    $("tm").classList.toggle("low", left <= 6);
+    if (left <= 0) answer(-1);
+  }, 100);
+}
+
+function answer(k) {
+  if (answered) return;
+  answered = true;
+  clearInterval(timer);
+  const q = deck[i];
+  const good = k === q.a;
+  let gain = 0;
+  if (good) {
+    streak += 1; ok += 1;
+    gain = 100 + Math.round((left / TIME) * 50) + Math.min(streak - 1, 5) * 20;
+    score += gain;
+  } else { streak = 0; }
+  log.push({ q: q.q, right: q.o[q.a], r: q.r, good: good });
+  [...$("opts").querySelectorAll(".opt")].forEach((b) => {
+    const kk = Number(b.dataset.k);
+    b.disabled = true;
+    const tag = document.createElement("span"); tag.className = "tag";
+    if (kk === q.a) { b.classList.add("good"); tag.textContent = "CORRECTA"; b.lastChild.appendChild(tag); }
+    else if (kk === k) { b.classList.add("bad"); tag.textContent = "TU RESPUESTA"; b.lastChild.appendChild(tag); }
+    else { b.classList.add("dim"); }
+  });
+  [...$("segs").children][i].className = "seg " + (good ? "ok" : "no");
+  $("sc").textContent = score;
+  $("st").textContent = streak;
+  $("fb").className = "fb " + (good ? "good" : "bad");
+  $("vd").textContent = good ? "Correcto, +" + gain + " puntos" : (k === -1 ? "Se acabó el tiempo" : "Incorrecto");
+  $("ex").textContent = q.e;
+  $("rf").textContent = "Tanenbaum, sección " + q.r;
+  $("next").textContent = i === N - 1 ? "Ver resultado →" : "Siguiente →";
+  $("fb").hidden = false;
+  $("fb").scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+function finish() {
+  clearInterval(timer);
+  const r = ok >= 9 ? 3 : ok >= 7 ? 2 : ok >= 4 ? 1 : 0;
+  const prev = getBest();
+  if (score > prev) setBest(score);
+  $("rank").textContent = RANKS[r];
+  $("fsc").textContent = score;
+  $("fok").textContent = ok + "/" + N;
+  $("fbest").textContent = Math.max(score, prev);
+  [...$("fstack").children].forEach((d) => d.classList.toggle("on", Number(d.dataset.r) === r));
+  const miss = log.filter((x) => !x.good);
+  $("missWrap").hidden = miss.length === 0;
+  $("miss").innerHTML = "";
+  miss.forEach((m) => {
+    const li = document.createElement("li");
+    const box = document.createElement("div");
+    const p1 = document.createElement("p"); p1.textContent = m.q;
+    const p2 = document.createElement("p"); p2.className = "ok"; p2.textContent = "Respuesta: " + m.right;
+    const p3 = document.createElement("p"); p3.className = "ref"; p3.textContent = "Tanenbaum, sección " + m.r;
+    box.append(p1, p2, p3);
+    li.appendChild(box);
+    $("miss").appendChild(li);
+  });
+  show("end");
+}
+
+$("go").addEventListener("click", start);
+$("again").addEventListener("click", () => { bestLabel(); start(); });
+$("next").addEventListener("click", () => { if (i === N - 1) finish(); else { i += 1; render(); } });
+document.addEventListener("keydown", (e) => {
+  if (mode === "play" && answered && e.key === "Enter" && document.activeElement !== $("next")) { e.preventDefault(); $("next").click(); return; }
+  if (mode !== "play" || answered) return;
+  const k = ["1", "2", "3", "4"].indexOf(e.key);
+  const l = LETTERS.indexOf(e.key.toUpperCase());
+  const pick = k >= 0 ? k : l;
+  if (pick >= 0 && pick < deck[i].o.length) answer(pick);
+});
+bestLabel();
+</script>
+</body>
+</html>
